@@ -125,7 +125,7 @@ def main():
     print(trial_runs(min(result)))
 
     def print_program():
-        def combo(operand):
+        def combo(operand)->str:
             match operand:
                 case 0 | 1 | 2 | 3:
                     return str(operand)
@@ -133,6 +133,8 @@ def main():
                     return "ABC"[operand - 4]
                 case 7:
                     return "Danger![7]"
+                case _:
+                    return "None"
         def literal(x):
             return str(x)
 

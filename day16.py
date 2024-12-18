@@ -1,7 +1,7 @@
 import sys
 
 from heapq import heapify, heappop, heappush
-from typing import List, Tuple
+from typing import List
 from collections import defaultdict
 import time
 
@@ -36,7 +36,7 @@ def neighbors(grid, node, dir):
         result[((i + di, j + dj), dir)] = 1
     return { ((i, j), (di, dj)): dscore for ((i, j), (di, dj)), dscore in result.items() if grid[i][j] != '#' }
 
-def get_char(dir: Tuple[int, int]):
+def get_char(dir: tuple[int, int]):
     match dir:
         case (0, 1):
             return '>'  
