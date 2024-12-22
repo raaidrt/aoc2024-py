@@ -16,38 +16,6 @@ def parse():
         codes.append(line.strip())
     return codes
 
-from copy import deepcopy as dc
-
-def bfs(grid: list[str], i: int, j: int) -> defaultdict[str, list[str]]: 
-    frontier: dict[tuple[int, int], list[str]] = { (i, j): [] }
-    visited : set[tuple[int, int]] = set()
-    result : defaultdict[str, list[str]] = defaultdict(lambda: [])
-    while len(frontier) > 0:
-        visited = visited.union(frontier)
-        for node, ls in frontier.items(): 
-            result[grid[node[0]][node[1]]] = dc(ls)
-        new_frontier: dict[tuple[int, int], list[str]] = { }
-        for node, ls in frontier.items():
-            i, j = node
-            for (di, dj), d in {(0, 1):'>', (0, -1):'<', (1, 0):'v', (-1, 0):'^'}.items():
-                if not (0 <= i + di < len(grid) and 0 <= j + dj < len(grid[0])): continue 
-                if grid[i + di][j + dj] == '.': continue
-                if (i + di, j + dj) in visited: continue
-                new_frontier[(i + di, j + dj)] = ls + [ d ]
-        frontier = new_frontier
-    return result
-        
-
-def apsp(grid: list[str]) -> defaultdict[str, defaultdict[str, list[str]]]:
-    def generate_default_dict() -> defaultdict[str, list[str]]:
-        return defaultdict(lambda: [])
-
-    result : defaultdict[str, defaultdict[str, list[str]]] = defaultdict(generate_default_dict)
-    for i, row in enumerate(grid):
-        for j, c in enumerate(row):
-            result[c] = bfs(grid, i, j)
-    return result
-
 def coords(grid: list[str]) -> defaultdict[str, tuple[int, int] | None]:
     result : defaultdict[str, tuple[int, int] | None]= defaultdict(lambda: None)
     for i, row in enumerate(grid):
@@ -56,19 +24,86 @@ def coords(grid: list[str]) -> defaultdict[str, tuple[int, int] | None]:
     return result
 
 def directions(pad: list[str], code: str): 
+    cmap = coords(pad)
     curr = "A"
-    dirs = apsp(pad)
 
     seq: list[str] = []
     for c in code:
-        d = dirs[curr][c]
+        res = cmap[c]
+        if res is None: 
+            raise Exception("Missing map")
+        i, j = res
+        res = cmap[curr]
+        if res is None: 
+            raise Exception("Missing map")
+        ci, cj = res
+        hori = ">"
+        if j < cj:
+            hori = "<"
+        vert = "v"
+        if i < ci:
+            vert = "^"
+        
+        s = ""
+        v_seq = vert * abs(i - ci)
+        h_seq = hori * abs(j - cj)
 
-        seq.append(''.join(d))
+        if len(pad) == 4:
+            match (hori, vert):
+                case ("<", "^"): 
+                    s = v_seq + h_seq
+                case (">", "v"): 
+                    s = h_seq + v_seq
+                case _:
+                    s = h_seq + v_seq
+        elif len(pad) == 2:
+            match (hori, vert):
+                case (">", "^"): 
+                    s = h_seq + v_seq
+                case ("<", "v"): 
+                    s = v_seq + h_seq
+                case _:
+                    s = h_seq + v_seq
+
+        seq.append(s)
         seq.append("A")
         curr = c
 
     return ''.join(seq)
 
+def verify(grid: list[str], moves: str) -> str:
+    result : list[str] = []
+    cmap: dict[str, tuple[int, int]] = { }
+    for i, row in enumerate(grid):
+        for j, c in enumerate(row):
+            cmap[c] = i, j
+    curr = "A"
+    dirs = { ">": (0, 1), "<": (0, -1), "^": (-1, 0), "v": (1, 0) }
+    for move in moves:
+        if move == "A": 
+            result.append(curr)
+        else:
+            di, dj = dirs[move]
+            i, j = cmap[curr]
+            curr = grid[i + di][j + dj]
+    return ''.join(result)
+
+def check(levels: int, moves: str) -> str:
+    for level in range(levels):
+        grid = direction
+        if level == levels - 1:
+            grid = keypad
+        
+        moves = verify(grid, moves)
+        print(f"\t level = {level} verification = {moves}")
+    return moves
+
+DEBUG: bool = True
+def dp(x):
+    if DEBUG:
+        print(x)
+
+print(f"verification for 379A = {check(3, '<v<A>>^AvA^A<vA<AA>>^AAvA<^A>AAvA^A<vA>^AA<A>A<v<A>A>^AAAvA<^A>A')}")
 
 def main():
     codes = parse()
@@ -76,15 +111,20 @@ def main():
     total = 0
     for code in codes:
         num = int(code[:-1])
-
+        
+        dp(f"processing code {code}")
         dirs = directions(keypad, code)
-        print(dirs)
+        dp(dirs)
+        print(f"verification {check(1, dirs)}")
         dirs = directions(direction, dirs)
-        print(dirs)
+        dp(dirs)
+        print(f"verification {check(2, dirs)}")
         dirs = directions(direction, dirs)
-        print(dirs)
-        dirs = directions(direction, dirs)
-        print(dirs)
+        dp(dirs)
+
+        print(f"verification {check(3, dirs)}")
+        
+        dp("")
 
         total += num * len(dirs)
 
