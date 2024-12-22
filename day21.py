@@ -8,6 +8,9 @@ keypad = [ "789" ,
 direction = [".^A",
                         "<v>"]
 
+from collections import defaultdict
+from tqdm import tqdm
+
 def parse():
     codes : list[str] = []
     for line in sys.stdin:
@@ -15,6 +18,11 @@ def parse():
     return codes
 
 from copy import deepcopy as dc
+
+def collect_unique_and_in_order(l : list[str]) -> list[str]: 
+    if l == []: return ["A"]
+    res = [ x for x in l if x[:-2] == "A" * (len(x) - 2) ]
+    return [ x[-2] for x in res ]
 
 class Lattice:
     def __init__(self, grids: list[list[str]]): 
@@ -60,46 +68,99 @@ class Lattice:
 
         result = { s for s in result if "." not in s }
         return result
+
     
-    def bfs(self, frontier: set[str], dest: str) -> int | None:
+    def bfs(self, frontier: set[str], dest: str) -> list[str] | None:
         visited : set[str] = set()
-        counter = 0
-        while len(frontier) > 0 and dest not in frontier:
+        frontier_dict: dict[str, list[str]] =  { s : [] for s in frontier }
+        while len(frontier_dict) > 0 and dest not in frontier_dict:
             # print(frontier)
-            visited = visited.union(frontier)
-            new_frontier : set[str] = set()
-            for node in frontier:
-                new_frontier = new_frontier.union(nbor for nbor in self.transition(node) if nbor not in visited)
-            counter += 1
-            frontier = new_frontier
-        if dest in frontier: 
-            return counter  
+            visited = visited.union(frontier_dict.keys())
+            new_frontier : dict[str, list[str]] = { }
+            for node in frontier_dict:
+                for nbor in self.transition(node):
+                    if nbor in visited: continue
+                    new_frontier[nbor] = dc(frontier_dict[node]) + [ nbor ]
+            frontier_dict = new_frontier
+        if dest in frontier_dict: 
+            return frontier_dict[dest]  
         else: return None
 
-for l in range(2, 10):
-    graph = Lattice([direction] * (l - 1) + [direction])
-    start = "A" * (l - 1) + ">"
-    end = "A" * (l - 1) + "^"
+TRY_LEVEL: int = 5
+graph = Lattice([direction] * (TRY_LEVEL - 1) + [keypad])
 
-    print(f"{start} -> {end}, bfs = {graph.bfs({ start }, end)}")
+transitions : defaultdict[str, dict[str, list[str]]] = defaultdict(lambda: { })
 
-LEVELS: int = 4
+print(f"Gathering transition information for keypad")
+for i, row in tqdm(enumerate(keypad), desc="outer", position=0):
+    for j, c in tqdm(enumerate(row), desc="inner", position=1, leave=False):
+        for ni, nrow in enumerate(keypad):
+            for nj, nc in enumerate(nrow):
+                if '.' in { c, nc }: continue
+                start = "A" * (TRY_LEVEL - 1) + c
+                end = "A" * (TRY_LEVEL - 1) + nc
+
+                res = graph.bfs({ start }, end)
+                if res == None: continue
+                res = collect_unique_and_in_order(res)
+                transitions[c][nc] = res
+
+graph = Lattice([direction] * TRY_LEVEL)
+print(f"Gathering transition information for direction board")
+for i, row in tqdm(enumerate(direction), desc="outer", position=0):
+    for j, c in tqdm(enumerate(row), desc="inner", position=1, leave=False):
+        for ni, nrow in enumerate(direction):
+            for nj, nc in enumerate(nrow):
+                if '.' in { c, nc }: continue
+                start = "A" * (TRY_LEVEL - 1) + c
+                end = "A" * (TRY_LEVEL - 1) + nc
+
+                res = graph.bfs({ start }, end)
+                if res == None: continue
+
+                res = collect_unique_and_in_order(res)
+                transitions[c][nc] = res
+
+LEVELS: int = 26
+
+def get_transitions(c: str) -> list[tuple[str, str]]:
+    if c == "": return []
+    b = c[0]
+    result : list[tuple[str, str]]= []
+    for x in c[1:]:
+        result.append((b, x))
+        b = x
+    return result
+
+
+def solve(code: str) -> int:
+    t_d: defaultdict[str, defaultdict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
+    code = "A" + code
+
+    # print(f"solving for {code} with transitions {get_transitions(code)}")
+
+    for b, e in get_transitions(code):
+        t_d[b][e] += 1
+
+
+    for _ in tqdm(range(LEVELS)):
+        t_d_n: defaultdict[str, defaultdict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
+        for b, next in t_d.items():
+            for e, count in next.items():
+                l = transitions[b][e]
+                for bn, en in get_transitions("A" + ''.join(l)):
+                    t_d_n[bn][en] += count
+        t_d = t_d_n
+    return sum(sum(x.values()) for x in t_d.values())
+
 
 def main():
     codes = parse()
-    graph = Lattice([direction] * (LEVELS - 1) + [keypad])
     total = 0
-    for code in codes:
+    print("Solving...")
+    for code in tqdm(codes, desc="outer"):
         num = int(code[:-1])
-        init = "A" * LEVELS
-        count = 0
-        for c in code:
-            dest = "A" * (LEVELS - 1) + c
-            res = graph.bfs({ init }, dest)
-            if res == None: 
-                raise Exception(f"Failed for init = {init} dest = {dest} ")
-            count += res            
-            init = dest
+        count = solve(code)
         
         total += num * count
     print(total)
